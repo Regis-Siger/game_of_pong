@@ -1,1 +1,1 @@
-Simple network game of pong using pygame, and sockets.
+Simple network game of pong using pygame and sockets.
