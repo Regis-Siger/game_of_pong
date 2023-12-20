@@ -6,6 +6,7 @@ import pickle
 SERVER_IP = "192.168.0.133"
 SERVER_PORT = 12346
 BUFFER_SIZE = 4096
+PASSWORD = '69'
 
 # game settings
 paddle_height = 80
@@ -135,9 +136,11 @@ def listen_for_players():
     while number_of_players < 2:
         name, address = veryfication_socket.recvfrom(BUFFER_SIZE)
         if players["player_1"]["name"] is None:
-            players["player_1"]["name"] = name
-            veryfication_socket.sendto(pickle.dumps('player_1'), (address))
-            number_of_players += 1
+            if authenticate():    
+                players["player_1"]["name"] = name
+                veryfication_socket.sendto(pickle.dumps('player_1'), (address))
+                number_of_players += 1
+
         elif players["player_2"]["name"] is None:
             players["player_2"]["name"] = name
             veryfication_socket.sendto(pickle.dumps('player_2'), (address))
@@ -146,15 +149,32 @@ def listen_for_players():
             veryfication_socket.sendto('WaitForPlayer', (address))
 
 # receive communication from clients
-def game_comms():
+def receive_data_from_client():
     while True:
         data, addr = sock.recvfrom(BUFFER_SIZE)
         player_id, player_pos, player_name = pickle.loads(data)
         players[player_id]["name"] = player_name
         players[player_id]["y"] = player_pos
-        players[player_id]["ip"], players[player_id]["port"] = addr        
+        players[player_id]["ip"], players[player_id]["port"] = addr    
+
+authentication_socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+authentication_socket.bind((SERVER_IP, 12347))
+
+def authenticate():
+    while True:
+        data, addr = authentication_socket.recvfrom(BUFFER_SIZE)
+        client_pass = pickle.loads(data)
+        if data:    
+            if client_pass == PASSWORD:
+                authentication_socket.sendto( pickle.dumps('OK'), addr)
+                return True
+            else:
+                authentication_socket.sendto( pickle.dumps('Wrong password, try again.'), addr)
+                
+
 
         
 threading.Thread(target=listen_for_players).start()
-threading.Thread(target=game_comms).start()
+threading.Thread(target=authenticate).start()
+threading.Thread(target=receive_data_from_client).start()
 threading.Thread(target=game_logic).start()
