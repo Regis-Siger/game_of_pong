@@ -6,6 +6,7 @@ import pickle
 SERVER_IP = "192.168.0.133"
 SERVER_PORT = 12346
 BUFFER_SIZE = 4096
+number_of_players = 0
 PASSWORD = '69'
 
 # game settings
@@ -129,8 +130,7 @@ def game_logic():
         # game update rate (60 fps)
         threading.Event().wait(1 / 60)
 
-# listen for incoming players
-number_of_players = 0
+# listen for incoming players and authenticate
 def listen_for_players():
     global number_of_players
     while number_of_players < 2:
@@ -142,9 +142,10 @@ def listen_for_players():
                 number_of_players += 1
 
         elif players["player_2"]["name"] is None:
-            players["player_2"]["name"] = name
-            veryfication_socket.sendto(pickle.dumps('player_2'), (address))
-            number_of_players += 1
+            if authenticate():
+                players["player_2"]["name"] = name
+                veryfication_socket.sendto(pickle.dumps('player_2'), (address))
+                number_of_players += 1
         else:
             veryfication_socket.sendto('WaitForPlayer', (address))
 
@@ -157,6 +158,7 @@ def receive_data_from_client():
         players[player_id]["y"] = player_pos
         players[player_id]["ip"], players[player_id]["port"] = addr    
 
+# authentication socekt setup to receive server password from clients
 authentication_socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
 authentication_socket.bind((SERVER_IP, 12347))
 

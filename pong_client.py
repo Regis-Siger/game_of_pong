@@ -6,6 +6,7 @@ import pickle
 SERVER_IP = "192.168.0.133"
 SERVER_PORT = 12346
 BUFFER_SIZE = 4096
+list_of_sockets = []
 
 # game settings
 paddle_height = 80
@@ -31,6 +32,7 @@ clock = pygame.time.Clock()
 
 # veryfication socket
 veryfication_socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+list_of_sockets.append(veryfication_socket)
 
 #TODO: send authentication data, receive confirmation
 # nie wiem czy w funkcji czy jako kolejne kroki
@@ -38,6 +40,7 @@ veryfication_socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
 # więc powinna to być chyba jednak funkcja, która jeśli zwróci True
 # to umożliwi wykonanie funkcji join_game()
 authentication_socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+list_of_sockets.append(authentication_socket)
 
 
 def authenticate():
@@ -53,7 +56,9 @@ def join_game():
     global running
     # send player name and authenticate with server password
     veryfication_socket.sendto(pickle.dumps(player_name), (SERVER_IP, 12345))
-    if authenticate():
+    authentication_is_successfull = authenticate()
+
+    if authentication_is_successfull:
         # receive player_id
         player_id_data, _ = veryfication_socket.recvfrom(BUFFER_SIZE)
         player_id = pickle.loads(player_id_data)
@@ -70,11 +75,12 @@ def join_game():
 
 # game socket setup
 sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+list_of_sockets.append(sock)
 
 # initial player position
 player_pos = game_height // 2 - paddle_height // 2
 
-# initial value for main game loop
+# initial value for the main game loop
 running = False
 
 # if you're assigned player_id we can start the game
@@ -86,6 +92,11 @@ while running:
     for event in pygame.event.get():
         if event.type == pygame.QUIT:
             running = False
+        elif event.type == pygame.KEYDOWN:
+            if event.key == pygame.K_ESCAPE:
+                running = False
+                pygame.quit()
+                for s in list_of_sockets: s.close()
 
     # player movement
     keys = pygame.key.get_pressed()
@@ -146,4 +157,4 @@ while running:
     clock.tick(60)
 
 pygame.quit()
-sock.close()
+for s in list_of_sockets: s.close()
