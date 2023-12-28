@@ -47,13 +47,17 @@ ball = {
     "max_vel": 9
 }
 
-# game socket setup
+# game socket setup to handle game_state exchange
 sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
 sock.bind((SERVER_IP, SERVER_PORT))
 
-# veryfication socket setup
-veryfication_socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-veryfication_socket.bind((SERVER_IP, 12345))
+# veryfication socket setup to receive players name
+identification_socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+identification_socket.bind((SERVER_IP, 12345))
+
+# authentication socket setup to receive server password from clients
+authentication_socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+authentication_socket.bind((SERVER_IP, 12347))
 
 print(f"Server started at {SERVER_IP}:{SERVER_PORT}")
 
@@ -133,23 +137,28 @@ def game_logic():
 # listen for incoming players and authenticate
 def listen_for_players():
     global number_of_players
-    while number_of_players < 2:
-        name, address = veryfication_socket.recvfrom(BUFFER_SIZE)
-        if players["player_1"]["name"] is None:
-            if authenticate():    
-                players["player_1"]["name"] = name
-                veryfication_socket.sendto(pickle.dumps('player_1'), (address))
-                number_of_players += 1
+    # while number_of_players < 2:
+    name, address = identification_socket.recvfrom(BUFFER_SIZE)
+    if players["player_1"]["name"] is None:
+        if authenticate():    
+            players["player_1"]["name"] = name
+            identification_socket.sendto(pickle.dumps('player_1'), (address))
+            number_of_players += 1
+            print('Player_1 connected. Name: ', name, ',\n Address: ', address)
 
-        elif players["player_2"]["name"] is None:
-            if authenticate():
-                players["player_2"]["name"] = name
-                veryfication_socket.sendto(pickle.dumps('player_2'), (address))
-                number_of_players += 1
-        else:
-            veryfication_socket.sendto('WaitForPlayer', (address))
+    elif players["player_2"]["name"] is None:
+        if authenticate():
+            players["player_2"]["name"] = name
+            identification_socket.sendto(pickle.dumps('player_2'), (address))
+            # let player_1 know we can start the game
+            player_1_addr = players["player_1"]["ip"], players["player_1"]["port"]
+            authentication_socket.sendto(pickle.dumps("START"), (player_1_addr) )
+            number_of_players += 1
+            print('Player_2 connected. Name: ', name, ',\n Address: ', address)
+    else:
+        identification_socket.sendto('Too many players', (address))
 
-# receive communication from clients
+# receive player movements from clients
 def receive_data_from_client():
     while True:
         data, addr = sock.recvfrom(BUFFER_SIZE)
@@ -158,10 +167,8 @@ def receive_data_from_client():
         players[player_id]["y"] = player_pos
         players[player_id]["ip"], players[player_id]["port"] = addr    
 
-# authentication socekt setup to receive server password from clients
-authentication_socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-authentication_socket.bind((SERVER_IP, 12347))
 
+# authenticate client against server password
 def authenticate():
     while True:
         data, addr = authentication_socket.recvfrom(BUFFER_SIZE)

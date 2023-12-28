@@ -21,24 +21,20 @@ player_name = input('Enter your name: ')
 password = input('Enter server password: ')
 server_pass = pickle.dumps(password)
 
-
-
-
 # initialize pygame
 pygame.init()
 screen = pygame.display.set_mode((game_width, game_height))
 pygame.display.set_caption("Game of Pong")
 clock = pygame.time.Clock()
 
-# veryfication socket
-veryfication_socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-list_of_sockets.append(veryfication_socket)
+# game socket setup
+sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+list_of_sockets.append(sock)
 
-#TODO: send authentication data, receive confirmation
-# nie wiem czy w funkcji czy jako kolejne kroki
-# cała reszta powinna zależeć od tego czy authentykacja będzie pozytywna
-# więc powinna to być chyba jednak funkcja, która jeśli zwróci True
-# to umożliwi wykonanie funkcji join_game()
+# set two sockets for identyfication and authentication
+identification_socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+list_of_sockets.append(identification_socket)
+
 authentication_socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
 list_of_sockets.append(authentication_socket)
 
@@ -50,32 +46,41 @@ def authenticate():
         status_code = pickle.loads(data)
         if status_code == 'OK':
             return True
+        else:
+            return False
 
 
 def join_game():
     global running
-    # send player name and authenticate with server password
-    veryfication_socket.sendto(pickle.dumps(player_name), (SERVER_IP, 12345))
+    # authenticate with server password
     authentication_is_successfull = authenticate()
 
     if authentication_is_successfull:
-        # receive player_id
-        player_id_data, _ = veryfication_socket.recvfrom(BUFFER_SIZE)
+        # send name and receive player_id
+        identification_socket.sendto(pickle.dumps(player_name), (SERVER_IP, 12345))
+        player_id_data, _ = identification_socket.recvfrom(BUFFER_SIZE)
         player_id = pickle.loads(player_id_data)
         print(f'player_id: {player_id}')
 
-        if player_id == 'player_1' or player_id == 'player_2':
+        if player_id == 'player_2':
             running = True
             return player_id
+        elif player_id == 'player_1':
+            waiting = True
+            while waiting:
+                print('. ', end='')
+                data,_ = authentication_socket.recvfrom(BUFFER_SIZE)
+                data = pickle.loads(data)
+                if data:
+                    if data == "START":
+                        running = True
+                        waiting = False
+                        return player_id
         else:
-            print('Waiting for the other player...')
+            print('Waiting for the server...')
     else:
         print('Wrong password, try again.')
 
-
-# game socket setup
-sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-list_of_sockets.append(sock)
 
 # initial player position
 player_pos = game_height // 2 - paddle_height // 2
