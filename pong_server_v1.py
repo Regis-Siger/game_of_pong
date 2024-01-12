@@ -130,24 +130,28 @@ def game_logic():
         # game update rate (60 fps)
         threading.Event().wait(1 / 60)
 
-# listen for incoming players and authenticate
+# listen for incoming players and authenticate them against PASSWORD
 def listen_for_players():
-    global number_of_players
-    while number_of_players < 2:
-        name, address = veryfication_socket.recvfrom(BUFFER_SIZE)
-        if players["player_1"]["name"] is None:
-            if authenticate():    
+    while True:
+        data, address = veryfication_socket.recvfrom(BUFFER_SIZE)
+        name, passw = pickle.loads(data)
+        print(f'{name} from {address} connected')
+        if passw == PASSWORD:
+            if players["player_1"]["name"] is None:
                 players["player_1"]["name"] = name
                 veryfication_socket.sendto(pickle.dumps('player_1'), (address))
-                number_of_players += 1
 
-        elif players["player_2"]["name"] is None:
-            if authenticate():
+
+            elif players["player_2"]["name"] is None:
                 players["player_2"]["name"] = name
                 veryfication_socket.sendto(pickle.dumps('player_2'), (address))
-                number_of_players += 1
+
+            else:
+                veryfication_socket.sendto(pickle.dumps('WaitForPlayer'), (address))
         else:
-            veryfication_socket.sendto('WaitForPlayer', (address))
+            print(f'{name} messed up the password, disconnected.')
+            veryfication_socket.sendto(pickle.dumps('Wrong password.'), (address))
+
 
 # receive communication from clients
 def receive_data_from_client():
@@ -158,25 +162,7 @@ def receive_data_from_client():
         players[player_id]["y"] = player_pos
         players[player_id]["ip"], players[player_id]["port"] = addr    
 
-# authentication socekt setup to receive server password from clients
-authentication_socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-authentication_socket.bind((SERVER_IP, 12347))
-
-def authenticate():
-    while True:
-        data, addr = authentication_socket.recvfrom(BUFFER_SIZE)
-        client_pass = pickle.loads(data)
-        if data:    
-            if client_pass == PASSWORD:
-                authentication_socket.sendto( pickle.dumps('OK'), addr)
-                return True
-            else:
-                authentication_socket.sendto( pickle.dumps('Wrong password, try again.'), addr)
-                
-
-
         
 threading.Thread(target=listen_for_players).start()
-threading.Thread(target=authenticate).start()
 threading.Thread(target=receive_data_from_client).start()
 threading.Thread(target=game_logic).start()

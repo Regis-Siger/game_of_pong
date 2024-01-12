@@ -19,10 +19,6 @@ game_height = 400
 # get player name and server password
 player_name = input('Enter your name: ')
 password = input('Enter server password: ')
-server_pass = pickle.dumps(password)
-
-
-
 
 # initialize pygame
 pygame.init()
@@ -34,44 +30,22 @@ clock = pygame.time.Clock()
 veryfication_socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
 list_of_sockets.append(veryfication_socket)
 
-#TODO: send authentication data, receive confirmation
-# nie wiem czy w funkcji czy jako kolejne kroki
-# cała reszta powinna zależeć od tego czy authentykacja będzie pozytywna
-# więc powinna to być chyba jednak funkcja, która jeśli zwróci True
-# to umożliwi wykonanie funkcji join_game()
-authentication_socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-list_of_sockets.append(authentication_socket)
-
-
-def authenticate():
-    authentication_socket.sendto(server_pass, (SERVER_IP, 12347))
-    data, _ = authentication_socket.recvfrom(BUFFER_SIZE)
-    if data:
-        status_code = pickle.loads(data)
-        if status_code == 'OK':
-            return True
-
 
 def join_game():
     global running
-    # send player name and authenticate with server password
-    veryfication_socket.sendto(pickle.dumps(player_name), (SERVER_IP, 12345))
-    authentication_is_successfull = authenticate()
-
-    if authentication_is_successfull:
-        # receive player_id
-        player_id_data, _ = veryfication_socket.recvfrom(BUFFER_SIZE)
-        player_id = pickle.loads(player_id_data)
-        print(f'player_id: {player_id}')
-
-        if player_id == 'player_1' or player_id == 'player_2':
-            running = True
-            return player_id
-        else:
-            print('Waiting for the other player...')
+     # send player name and server password
+    veryfication_socket.sendto(pickle.dumps((player_name, password)), (SERVER_IP, 12345))
+    # receive player_id or rejected password message
+    player_id_data, _ = veryfication_socket.recvfrom(BUFFER_SIZE)
+    player_id = pickle.loads(player_id_data)
+    print(f'player_id: {player_id}')
+    if player_id == 'player_1' or player_id == 'player_2':
+        # set global running to True to start the main game loop
+        running = True
+        return player_id
     else:
-        print('Wrong password, try again.')
-
+        print('Wrong password. Try again, it might have been a typo...')
+        quit()
 
 # game socket setup
 sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
